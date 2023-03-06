@@ -1,0 +1,359 @@
+# Find and Replace all "wled" with the name of your wled device "Server description".
+# Find and Replace all "media_player.office" with the name of your HA media player.
+# Find and Replace all "climate.floor_heat" with the name of your climate entity.
+# Find and Replace all "sensor.temperature" with the name of your room temperature sensor.
+# Replace lanbone with the name of your lanbon device
+lanbon:
+  objects:
+    - obj: "p2b103" # switch reverse, checkbox or btn with toggle true
+      properties:
+        "val": '{{ 1 if is_state("switch.wled_nightlight", "on") else 0 }}' 
+        "text": '{{ "\uE6E8" if is_state("switch.wled_nightlight", "on") else "\uE335" | e }}'
+      event:
+        "down":
+          - service: homeassistant.toggle
+            entity_id: "switch.wled_nightlight"
+    - obj: "p2b106" # Light brightness
+      properties:
+        "val": "{{ state_attr('light.wled', 'brightness') if state_attr('light.wled', 'brightness') != None else 0 }}"
+      event:
+        "changed":
+          - service: light.turn_on
+            data:
+              entity_id: light.wled
+              brightness: "{{ val }}"
+        "up":
+          - service: light.turn_on
+            data:
+              entity_id: light.wled
+              brightness: "{{ val }}"
+    - obj: "p2b115" # Intensity
+      properties:
+        "val": "{{ state_attr('number.wled_intensity', 'intensity') if state_attr('number.wled_intensity', 'intensity') != None else 0 }}"
+      event:
+        "changed":
+          - service: light.turn_on
+            data:
+              entity_id: number.wled_intensity
+              value: "{{ val }}"
+        "up":
+          - service: number.set_value
+            data:
+              entity_id: number.wled_intensity
+              value: "{{ val }}"
+    - obj: "p2b116" # Speed
+      properties:
+        "val": "{{ state_attr('number.wled_speed', 'Speed') if state_attr('number.wled_speed', 'Speed') != None else 0 }}"
+      event:
+        "changed":
+          - service: light.turn_on
+            data:
+              entity_id: number.wled_speed
+              value: "{{ val }}"
+        "up":
+          - service: number.set_value
+            data:
+              entity_id: number.wled_speed
+              value: "{{ val }}"
+    - obj: "p2b107" # ColorPicker
+      properties:
+        "color": >
+          {% if is_state('light.wled','on') %}
+          {% set rgb = state_attr('light.wled','rgb_color') %}
+          {{ "#%02x%02x%02x" | format(rgb[0],rgb[1],rgb[2]) }}
+          {% endif %}
+      event:
+        "up":
+          - service: light.turn_on
+            data:
+              entity_id: light.wled
+              rgb_color: "[{{ r }},{{ g }},{{ b }}]"
+    - obj: "p2b108" # dropdown
+      properties:
+        "options": >
+          {% if not (is_state('select.wled_preset','unavailable')) %}{%for item in state_attr('select.wled_preset','options')%}{{item+"\n"|e}}{%-if not loop.last%}{%-endif%}{%-endfor%}{% endif %}
+        "val": >
+          {% if not (is_state('select.wled_preset','unavailable')) %}{%for item in state_attr('select.wled_preset','options')%}
+          {{loop.index -1 if item == states('select.wled_preset') }}
+          {%-endfor%}{% endif %}
+      event:
+        "changed":
+          - service: select.select_option
+            data:
+              option: "{{ text }}"
+            target:
+              entity_id: select.wled_preset
+    - obj: "p2b110"
+      properties:
+        "text": "{{state_attr('light.wled','effect')}}"
+      event:
+        "down":
+          - service: light.turn_on
+            data:
+              effect: "{{ state_attr('light.wled', 'effect_list') | random }}"
+              entity_id: light.wled
+    - obj: "p3b12" # artist label
+      properties:
+        "text": "{{ state_attr('media_player.office','media_artist') if state_attr('media_player.office','media_artist') else '-' }}"
+    - obj: "p3b13" # title label
+      properties:
+        "text": "{{ state_attr('media_player.office','media_title') if state_attr('media_player.office','media_title') else '-' }}"
+    - obj: "p3b14" # progressbar
+      properties:
+        "max": "{{ state_attr('media_player.office','media_duration') | int }}"
+        "val": "{{ state_attr('media_player.office','media_position') | int }}"
+    - obj: "p3b18" # play/pause/stop
+      properties:
+        "text": >
+          {% if is_state('media_player.office', 'playing') %}
+          {{ "\uE3E4" | e }}
+          {%-else %}
+          {{ "\uE40A" | e }}
+          {%-endif %}
+        "text_opa": "{{ '80' if states('media_player.office') in ['unavailable', 'unknown'] else '255' }}"
+      event:
+        "down":
+          - service: media_player.media_play_pause
+            target:
+              entity_id: media_player.office
+        "long":
+          - service: media_player.media_stop
+            target:
+              entity_id: media_player.office
+    - obj: "p3b17" # prev
+      properties:
+        "text_opa": "{{ '80' if states('media_player.office') in ['unavailable', 'unknown'] else '255' }}"
+      event:
+        "down":
+          - service: media_player.media_previous_track
+            target:
+              entity_id: media_player.office
+    - obj: "p3b19" # next
+      properties:
+        "text_opa": "{{ '80' if states('media_player.office') in ['unavailable', 'unknown'] else '255' }}"
+      event:
+        "down":
+          - service: media_player.media_next_track
+            target:
+              entity_id: media_player.office
+    - obj: "p3b20" # volume slider
+      properties:
+        "val": >
+          {% if (state_attr('media_player.office','volume_level') != none and states('media_player.office') not in ['unavailable', 'unknown']) %}
+          {{ state_attr('media_player.office','volume_level') * 100 | int(default=80) }}
+          {%-endif %}
+        "click": "{{ 'false' if states('media_player.office') in ['unavailable', 'unknown'] else 'true' }}"
+      event:
+        "changed":
+          - service: media_player.volume_set
+            data:
+              entity_id: media_player.office
+              volume_level: "{{ val | int / 100 }}"
+        "up":
+          - service: media_player.volume_set
+            data:
+              entity_id: media_player.office
+              volume_level: "{{ val | int / 100 }}"
+
+    - obj: "p4b20" # arc slider
+      properties:
+        "val": >
+          {% if state_attr('climate.floor_heat','temperature') is not none %}
+          {{ state_attr('climate.floor_heat','temperature') | int * 10 }}
+          {%- endif %}
+        "min": >
+          {% if state_attr('climate.floor_heat','min_temp') is not none %}
+          {{ state_attr('climate.floor_heat','min_temp') | int * 10 }}
+          {%- endif %}
+        "max": >
+          {% if state_attr('climate.floor_heat','max_temp') is not none %}
+          {{ state_attr('climate.floor_heat','max_temp') | int * 10 }}
+          {%- endif %}
+        "opacity": "{{ 60 if (is_state('climate.floor_heat','unavailable') or is_state('climate.floor_heat','unknown')) else 255 }}"
+        "click": "{{ 'false' if (is_state('climate.floor_heat','unavailable') or is_state('climate.floor_heat','unknown')) else 'true' }}"
+        "line_color1": >
+          {% if is_state('climate.floor_heat', 'cool') %}
+          {{ "#346beb" }}
+          {%-elif is_state('climate.floor_heat', 'heat_cool') %}
+          {{ "#34bdeb" }}
+          {%-elif is_state('climate.floor_heat', 'heat') %}
+          {{ "#eb3434" }}
+          {%-elif is_state('climate.floor_heat', 'dry') %}
+          {{ "#ebeb34" }}
+          {%-elif is_state('climate.floor_heat', 'fan_only') %}
+          {{ "#34eb77" }}
+          {%-else %}
+          {{ "#9f96b0" }}
+          {% endif %}
+      event:
+        "changed":
+          - service: climate.set_temperature
+            target:
+              entity_id: climate.floor_heat
+            data:
+              temperature: "{{ val | int / 10 }}"
+        "up":
+          - service: climate.set_temperature
+            target:
+              entity_id: climate.floor_heat
+            data:
+              temperature: "{{ val | int / 10 }}"
+
+    - obj: "p4b21" # gauge current temp
+      properties:
+        "val": >
+          {% if not (is_state('sensor.temperature','unavailable') or is_state('sensor.temperature','unknown')) %}
+          {{ states('sensor.temperature') | float (default=0) * 10 }}
+          {%- endif %}
+        "min": >
+          {% if state_attr('climate.floor_heat','min_temp') is not none %}
+          {{ state_attr('climate.floor_heat','min_temp') | int * 10 }}
+          {%- endif %}
+        "max": >
+          {% if state_attr('climate.floor_heat','max_temp') is not none %}
+          {{ state_attr('climate.floor_heat','max_temp') | int * 10 }}
+          {%- endif %}
+        "critical_value": >
+          {% if state_attr('climate.floor_heat','max_temp') is not none %}
+          {{ state_attr('climate.floor_heat','max_temp') | int * 10 + 1 }}
+          {%- endif %}
+        "label_count": >
+          {% if state_attr('climate.floor_heat','max_temp') is not none %}
+          {{ state_attr('climate.floor_heat','max_temp') | int - state_attr('climate.floor_heat','min_temp') | int + 1 }}
+          {%- endif %}
+        "line_count": >
+          {% if state_attr('climate.floor_heat','max_temp') is not none %}
+          {{ (state_attr('climate.floor_heat','max_temp') | int - state_attr('climate.floor_heat','min_temp') | int) * 2 + 1 }}
+          {%- endif %}
+        "opacity": "{{ 60 if (is_state('climate.floor_heat','unavailable') or is_state('climate.floor_heat','unknown')) else 255 }}"
+
+    - obj: "p4b23" # label current temp (and +/- with short/long touch)
+      properties:
+        "text": >
+          {% if (is_state('sensor.temperature','unavailable') or is_state('sensor.temperature','unknown')) %}
+          {{ "--.-" }}
+          {%-else %}
+          {{ states('sensor.temperature') | round(1,default=0) }}
+          {%- endif %}
+        "click": "{{ 'false' if (is_state('climate.floor_heat','unavailable') or is_state('climate.floor_heat','unknown')) else 'true' }}"
+        "opacity": "{{ 60 if (is_state('climate.floor_heat','unavailable') or is_state('climate.floor_heat','unknown')) else 255 }}"
+      event:
+        "up":
+          - service: climate.set_temperature
+            target:
+              entity_id: climate.floor_heat
+            data:
+              temperature: "{{ state_attr('climate.floor_heat','temperature') + state_attr('climate.floor_heat','target_temp_step') | float(default=1)}}"
+        "long":
+          - service: climate.set_temperature
+            target:
+              entity_id: climate.floor_heat
+            data:
+              temperature: "{{ state_attr('climate.floor_heat','temperature') - state_attr('climate.floor_heat','target_temp_step') | float(default=1)}}"
+
+    - obj: "p4b25" # label target temp
+      properties:
+        "text": >
+          {% if state_attr('climate.floor_heat','temperature') is not none %}
+          {{ state_attr('climate.floor_heat','temperature') }}
+          {%- endif %}
+        "opacity": "{{ 60 if (is_state('climate.floor_heat','unavailable') or is_state('climate.floor_heat','unknown')) else 255 }}"
+
+    - obj: "p4b41" # on/off switch
+      properties:
+        "val": "{{ 0 if (is_state('climate.floor_heat', 'off') or is_state('climate.floor_heat', 'unavailable')) else 1 }}"
+        "click": "{{ 'false' if (is_state('climate.floor_heat','unavailable') or is_state('climate.floor_heat','unknown')) else 'true' }}"
+        "opacity": "{{ 60 if (is_state('climate.floor_heat','unavailable') or is_state('climate.floor_heat','unknown')) else 255 }}"
+      event:
+        "down":
+          - service_template: >
+              {% if val == 0 -%}
+              climate.turn_on
+              {% else -%}
+              climate.turn_off
+              {% endif -%}
+            entity_id: "climate.floor_heat"
+    - obj: "p4b30" # tab dots
+      event:
+        "changed":
+          - service: openhasp.command
+            target:
+              entity_id: openhasp.lanbon
+            data:
+              keyword: p3b26.text
+              parameters: >
+                {% if val == 0 %}
+                {{ "#000000 \u2022# #909090 \u2022# #909090 \u2022#" | e }}
+                {%-elif val == 1 %}
+                {{ "#909090 \u2022# #000000 \u2022# #909090 \u2022#" | e }}
+                {%-elif val == 2 %}
+                {{ "#909090 \u2022# #909090 \u2022# #000000 \u2022#" | e }}
+                {% endif %}
+    - obj: "p4b42" # dropdown with fan_modes
+      properties:
+        "options": >
+          {% if state_attr('climate.floor_heat','fan_modes') is not none %}{%for mode in state_attr('climate.floor_heat','fan_modes')%}
+          {%- if mode == 'auto' -%}
+          Automatic{{"\n"|e}}
+          {%- elif mode == 'low' -%}
+          Low{{"\n"|e}}
+          {%- elif mode == 'medium' -%}
+          Medium{{"\n"|e}}
+          {%- elif mode == 'high' -%}
+          High{{"\n"|e}}
+          {%- elif mode == 'turbo' -%}
+          Turbo{{"\n"|e}}
+          {%- endif -%}
+          {%-if not loop.last%}{%-endif%}{%-endfor%}{% endif %}
+        "click": "{{ 'false' if (is_state('climate.floor_heat','unavailable') or is_state('climate.floor_heat','unknown')) else 'true' }}"
+        "val": >
+          {% if not (is_state('climate.floor_heat','unavailable')) %}{%for mode in state_attr('climate.floor_heat','fan_modes')%}
+          {{loop.index -1 if mode == state_attr('climate.floor_heat','fan_mode') }}
+          {%-endfor%}{% endif %}
+      event:
+        "changed":
+          - service: climate.set_fan_mode
+            target:
+              entity_id: climate.floor_heat
+            data:
+              fan_mode: >
+                {% if text == "Automatic" -%}
+                auto
+                {% elif text == 'Low' -%}
+                low
+                {% elif text == 'Medium' -%}
+                medium
+                {% elif text == 'High' -%}
+                high
+                {% elif text == 'Turbo' -%}
+                turbo
+                {% endif -%}
+    - obj: "p4b43" # dropdown with hvac_modes
+      properties:
+        "options": >
+          {% if state_attr('climate.floor_heat','hvac_modes') is not none %}{%for mode in state_attr('climate.floor_heat','hvac_modes')%}
+          {%- if mode == 'off' -%}
+          Off{{"\n"|e}}
+          {%- elif mode == 'cool' -%}
+          Cooling{{"\n"|e}}
+          {%- else -%}
+          On{{"\n"|e}}
+          {%- endif -%}
+          {%-if not loop.last%}{%-endif%}{%-endfor%}{% endif %}
+        "click": "{{ 'false' if (is_state('climate.floor_heat','unavailable') or is_state('climate.floor','unknown')) else 'true' }}"
+        "val": >
+          {% if not (is_state('climate.floor_heat','unavailable')) %}{%for mode in state_attr('climate.floor_heat','hvac_modes')%}
+          {{loop.index -1 if mode == states('climate.floor_heat') }}
+          {%-endfor%}{% endif %}
+      event:
+        "changed":
+          - service: climate.set_hvac_mode
+            target:
+              entity_id: climate.floor_heat
+            data:
+              hvac_mode: >
+                {% if text == "Off" -%}
+                off
+                {% elif text == 'Cooling' -%}
+                cool
+                {% endif -%}
